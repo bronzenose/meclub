@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Microelectronics Club</title>
+		<!-- link href='main.css' rel='stylesheet' type='text/css' -->
+		<meta name="theme-color" content="#00878f">
+		<!-- <meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0' name='viewport' -->
+		<meta content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=1' name='viewport'>
+		<script src="rctruck.js" type="text/javascript"></script>
+	</head>
+
+	<body>
+		<center>
+			<header>
+				<h1>Microelectronics Club Truck Remote Control</h1>
+			</header>
+			<div>
+				<table>
+					<tr>
+						<!-- we could also use type=range but that doesn't show the actual numeric value-->
+						<td style="width:14.4px; text-align: right">Left speed: </td>
+						<td><input class="enabled" id="wheelL" type="number" min="0" max="99" step="1" oninput="sliderChange(1);" value="75"></td>
+					</tr>
+					<tr>
+						<td style="width:14.4px; text-align: right">Right speed2: </td>
+						<td><input class="enabled" id="wheelR" type="number" min="0" max="99" step="1" oninput="sliderChange(2);" value="75"></td>
+					</tr>
+					<tr>
+						<td style="width:14.4px; text-align: right">How Long: </td>
+						<td><input class="enabled" id="duration" type="range" min="0" max="20" step="1" oninput="sliderChange(3);" value="10"></td>
+					</tr>
+				</table>
+				<p style="margin:8px 0px">
+				<button id="go" class="button" style="background-color:#999" onclick="startWheels();">Go!</button>
+				</p>
+				<p style="margin:8px 0px">
+				<button id="stop" class="button" style="background-color:#e11" onclick="stopWheels();">Stop!</button>
+				</p>
+			</div>
+		</center>
+	</body>
+</html>
+
