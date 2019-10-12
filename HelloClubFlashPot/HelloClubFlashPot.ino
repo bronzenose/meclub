@@ -159,7 +159,7 @@ void startSPIFFS() {
 	SPIFFS.begin();
 }
 
-String getContentType(String filename) { // determine the filetype of a given filename, based on the extension
+String getContentType(String filename) {
 	if (filename.endsWith(".html")) return "text/html";
 	else if (filename.endsWith(".css")) return "text/css";
 	else if (filename.endsWith(".js")) return "application/javascript";
@@ -170,26 +170,26 @@ String getContentType(String filename) { // determine the filetype of a given fi
 }
 
 void vHandleNotFound(){
-	if(!handleFileRead(server.uri())){          // check if the file exists in the flash memory (SPIFFS), if so, send it
+	if(!handleFileRead(server.uri())){
 		server.send(404, "text/plain", "404: File Not Found");
 	}
 }
 
-bool handleFileRead(String path) { // send the right file to the client (if it exists)
+bool handleFileRead(String path) {
 	Serial.println("handleFileRead: " + path);
-	if (path.endsWith("/")) path += "index.html";          // If a folder is requested, send the index file
-	String contentType = getContentType(path);             // Get the MIME type
+	if (path.endsWith("/")) path += "index.html";
+	String contentType = getContentType(path);
 	String pathWithGz = path + ".gz";
-	if (SPIFFS.exists(pathWithGz) || SPIFFS.exists(path)) { // If the file exists, either as a compressed archive, or normal
-		if (SPIFFS.exists(pathWithGz))                         // If there's a compressed version available
-			path += ".gz";                                         // Use the compressed verion
-		File file = SPIFFS.open(path, "r");                    // Open the file
-		size_t sent = server.streamFile(file, contentType);    // Send it to the client
-		file.close();                                          // Close the file again
+	if (SPIFFS.exists(pathWithGz) || SPIFFS.exists(path)) {
+		if (SPIFFS.exists(pathWithGz))
+			path += ".gz";
+		File file = SPIFFS.open(path, "r");
+		size_t sent = server.streamFile(file, contentType);
+		file.close();
 		Serial.println(String("\tSent file: ") + path);
 		return true;
 	}
-	Serial.println(String("\tFile Not Found: ") + path);   // If the file doesn't exist, return false
+	Serial.println(String("\tFile Not Found: ") + path);
 	return false;
 }
 void setup() {
