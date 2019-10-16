@@ -64,7 +64,7 @@ class ClubMember {
 				const char* const pszMdnsName,
 				const char* const pszOTAName,
 				const char* const pszOTAPassword
-			  ) :
+				) :
 			m_mbrid(mbrid),
 			m_pszMemberName(pszMemberName),
 			m_pszSsid(pszSsid),
@@ -116,6 +116,39 @@ void vHandleRoot(){
 	server.sendContent(""); // this might end the sending like https://community.platformio.org/t/how-to-split-up-a-long-html-page/3633
 }
 
+class PeriodicEvent {
+	protected:
+		unsigned long m_cmsNextEvent;
+		const unsigned long m_cmsInterval;
+	public:
+		PeriodicEvent(const unsigned long cmsInterval) : m_cmsInterval(cmsInterval), m_cmsNextEvent(millis()) {
+		}
+
+		bool bEventFired() {
+			long cmsNow = millis();
+			if(cmsNow >= m_cmsNextEvent){
+				// Deal with overflow.
+				if(m_cmsNextEvent < m_cmsInterval && cmsNow > (ULONG_MAX-m_cmsInterval)) {
+					Serial.println("millis overflow");
+				} else {
+					m_cmsNextEvent += m_cmsInterval; // offset from previous event, not from 'now'
+					return true;
+				}
+			}
+			return false;
+		}
+};
+
+float rAnalogReadA0() {
+	static PeriodicEvent s_tickA0(50);
+	static float s_rA0; // will be initialized on first read
+	if(s_tickA0.bEventFired()){
+		const long nA0 = analogRead(A0);
+		s_rA0 = ((float)nA0)/1023.0;
+	}
+	return s_rA0;
+}
+
 void vHandleHello(){
 	server.send(200, "text/html", "<h1>Hello</h1><p>microelectronics club!</p>");
 }
@@ -124,22 +157,17 @@ void startWiFi() {
 	const ClubMember* const pmbr = ClubMember::pmbrOwnerOfThisESP8266();
 	const char* const pszSsid = pmbr->pszSsid();
 	const char* const pszPwd = pmbr->pszPassword();
-	Serial.printf("Beginning SSID %s with pwd %s\n", pszSsid, pszPwd);
-	/*
-	// to join an existing wifi established by another Access Point
-	WiFi.begin(pszSsid, pszPwd);
-	while (WiFi.status() != WL_CONNECTED) {
-	delay(250);
-	Serial.print(".");
-	}
-	 */
-	// to stablish our own Access Point for others to join
+	WiFi.setAutoConnect(1);
 	WiFi.mode(WIFI_AP);
 	WiFi.softAP(pszSsid, pszPwd);
-	while(WiFi.softAPgetStationNum() < 1) {
-		delay(250);
+}
+
+void vHandleNotFound(){
+	if(!handleFileRead(server.uri())){
+		server.send(404, "text/plain", "404: File Not Found");
 	}
 }
+
 
 void startWebServer() {
 	server.on("/", vHandleRoot);
@@ -159,7 +187,7 @@ void startSPIFFS() {
 	SPIFFS.begin();
 }
 
-String getContentType(String filename) { // determine the filetype of a given filename, based on the extension
+String getContentType(String filename) {
 	if (filename.endsWith(".html")) return "text/html";
 	else if (filename.endsWith(".css")) return "text/css";
 	else if (filename.endsWith(".js")) return "application/javascript";
@@ -169,55 +197,45 @@ String getContentType(String filename) { // determine the filetype of a given fi
 	return "text/plain";
 }
 
-void vHandleNotFound(){
-	if(!handleFileRead(server.uri())){          // check if the file exists in the flash memory (SPIFFS), if so, send it
-		server.send(404, "text/plain", "404: File Not Found");
-	}
-}
-
-bool handleFileRead(String path) { // send the right file to the client (if it exists)
+bool handleFileRead(String path) {
 	Serial.println("handleFileRead: " + path);
-	if (path.endsWith("/")) path += "index.html";          // If a folder is requested, send the index file
-	String contentType = getContentType(path);             // Get the MIME type
+	if (path.endsWith("/")) path += "index.html";
+	String contentType = getContentType(path);
 	String pathWithGz = path + ".gz";
-	if (SPIFFS.exists(pathWithGz) || SPIFFS.exists(path)) { // If the file exists, either as a compressed archive, or normal
-		if (SPIFFS.exists(pathWithGz))                         // If there's a compressed version available
-			path += ".gz";                                         // Use the compressed verion
-		File file = SPIFFS.open(path, "r");                    // Open the file
-		size_t sent = server.streamFile(file, contentType);    // Send it to the client
-		file.close();                                          // Close the file again
+	if (SPIFFS.exists(pathWithGz) || SPIFFS.exists(path)) {
+		if (SPIFFS.exists(pathWithGz))
+			path += ".gz";
+		File file = SPIFFS.open(path, "r");
+		size_t sent = server.streamFile(file, contentType);
+		file.close();
 		Serial.println(String("\tSent file: ") + path);
 		return true;
 	}
-	Serial.println(String("\tFile Not Found: ") + path);   // If the file doesn't exist, return false
+	Serial.println(String("\tFile Not Found: ") + path);
 	return false;
 }
+
 void setup() {
 	Serial.begin(115200);
 	startWiFi();   // 1st
 	startSPIFFS(); // 1.5th
 	startOTA();    // 2nd
 	startWebServer(); // 6th (last)
+	pinMode(A0, INPUT);
 	pinMode(g_pinLedOne, OUTPUT);
 	pinMode(g_pinLedTwo, OUTPUT);
-	digitalWrite(g_pinLedOne, LOW);
-	digitalWrite(g_pinLedTwo, LOW);
-	delay(250);
-	digitalWrite(g_pinLedOne, HIGH);
-	digitalWrite(g_pinLedTwo, HIGH);
-	delay(250);
-	digitalWrite(g_pinLedOne, LOW);
-	digitalWrite(g_pinLedTwo, LOW);
-	delay(250);
-	digitalWrite(g_pinLedOne, HIGH);
-	digitalWrite(g_pinLedTwo, HIGH);
 }
 
 void loop() {
 	server.handleClient();
 	ArduinoOTA.handle();
-	const long cms = millis();
-	const int iQuarterNote = (cms / 1000) % 4;
+	long cmsOneBar = 1000;
+	const long cmsMin = 10;
+	if(cmsMin > cmsOneBar) {
+		cmsOneBar = cmsMin;
+	}
+	long cmsNow = millis();
+	const int iQuarterNote = (cmsNow / cmsOneBar) % 4;
 	int nLedOneState = g_nLedOn;
 	int nLedTwoState = g_nLedOn;
 	if(1 < iQuarterNote) {

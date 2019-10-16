@@ -64,7 +64,7 @@ class ClubMember {
 				const char* const pszMdnsName,
 				const char* const pszOTAName,
 				const char* const pszOTAPassword
-			  ) :
+				) :
 			m_mbrid(mbrid),
 			m_pszMemberName(pszMemberName),
 			m_pszSsid(pszSsid),
@@ -116,6 +116,39 @@ void vHandleRoot(){
 	server.sendContent(""); // this might end the sending like https://community.platformio.org/t/how-to-split-up-a-long-html-page/3633
 }
 
+class PeriodicEvent {
+	protected:
+		unsigned long m_cmsNextEvent;
+		const unsigned long m_cmsInterval;
+	public:
+		PeriodicEvent(const unsigned long cmsInterval) : m_cmsInterval(cmsInterval), m_cmsNextEvent(millis()) {
+		}
+
+		bool bEventFired() {
+			long cmsNow = millis();
+			if(cmsNow >= m_cmsNextEvent){
+				// Deal with overflow.
+				if(m_cmsNextEvent < m_cmsInterval && cmsNow > (ULONG_MAX-m_cmsInterval)) {
+					Serial.println("millis overflow");
+				} else {
+					m_cmsNextEvent += m_cmsInterval; // offset from previous event, not from 'now'
+					return true;
+				}
+			}
+			return false;
+		}
+};
+
+float rAnalogReadA0() {
+	static PeriodicEvent s_tickA0(50);
+	static float s_rA0; // will be initialized on first read
+	if(s_tickA0.bEventFired()){
+		const long nA0 = analogRead(A0);
+		s_rA0 = ((float)nA0)/1023.0;
+	}
+	return s_rA0;
+}
+
 void vHandleHello(){
 	server.send(200, "text/html", "<h1>Hello</h1><p>microelectronics club!</p>");
 }
@@ -124,20 +157,14 @@ void startWiFi() {
 	const ClubMember* const pmbr = ClubMember::pmbrOwnerOfThisESP8266();
 	const char* const pszSsid = pmbr->pszSsid();
 	const char* const pszPwd = pmbr->pszPassword();
-	Serial.printf("Beginning SSID %s with pwd %s\n", pszSsid, pszPwd);
-	/*
-	// to join an existing wifi established by another Access Point
-	WiFi.begin(pszSsid, pszPwd);
-	while (WiFi.status() != WL_CONNECTED) {
-	delay(250);
-	Serial.print(".");
-	}
-	 */
-	// to stablish our own Access Point for others to join
+	WiFi.setAutoConnect(1);
 	WiFi.mode(WIFI_AP);
 	WiFi.softAP(pszSsid, pszPwd);
-	while(WiFi.softAPgetStationNum() < 1) {
-		delay(250);
+}
+
+void vHandleNotFound(){
+	if(!handleFileRead(server.uri())){
+		server.send(404, "text/plain", "404: File Not Found");
 	}
 }
 
@@ -169,12 +196,6 @@ String getContentType(String filename) {
 	return "text/plain";
 }
 
-void vHandleNotFound(){
-	if(!handleFileRead(server.uri())){
-		server.send(404, "text/plain", "404: File Not Found");
-	}
-}
-
 bool handleFileRead(String path) {
 	Serial.println("handleFileRead: " + path);
 	if (path.endsWith("/")) path += "index.html";
@@ -192,36 +213,28 @@ bool handleFileRead(String path) {
 	Serial.println(String("\tFile Not Found: ") + path);
 	return false;
 }
+
 void setup() {
 	Serial.begin(115200);
 	startWiFi();   // 1st
 	startSPIFFS(); // 1.5th
 	startOTA();    // 2nd
 	startWebServer(); // 6th (last)
+	pinMode(A0, INPUT);
 	pinMode(g_pinLedOne, OUTPUT);
 	pinMode(g_pinLedTwo, OUTPUT);
-	digitalWrite(g_pinLedOne, LOW);
-	digitalWrite(g_pinLedTwo, LOW);
-	delay(250);
-	digitalWrite(g_pinLedOne, HIGH);
-	digitalWrite(g_pinLedTwo, HIGH);
-	delay(250);
-	digitalWrite(g_pinLedOne, LOW);
-	digitalWrite(g_pinLedTwo, LOW);
-	delay(250);
-	digitalWrite(g_pinLedOne, HIGH);
-	digitalWrite(g_pinLedTwo, HIGH);
 }
 
 void loop() {
 	server.handleClient();
 	ArduinoOTA.handle();
-	const long cms = millis();
-	long cmsOneBar = analogRead(A0);
-	if(3 > cmsOneBar) {
-		cmsOneBar = 3;
+	long cmsOneBar = (long)(500.0 * rAnalogReadA0());
+	const long cmsMin = 10;
+	if(cmsMin > cmsOneBar) {
+		cmsOneBar = cmsMin;
 	}
-	const int iQuarterNote = (cms / cmsOneBar) % 4;
+	long cmsNow = millis();
+	const int iQuarterNote = (cmsNow / cmsOneBar) % 4;
 	int nLedOneState = g_nLedOn;
 	int nLedTwoState = g_nLedOn;
 	if(1 < iQuarterNote) {
