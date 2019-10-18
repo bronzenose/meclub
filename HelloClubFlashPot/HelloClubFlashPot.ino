@@ -228,7 +228,8 @@ void setup() {
 void loop() {
 	server.handleClient();
 	ArduinoOTA.handle();
-	long cmsOneBar = (long)(500.0 * rAnalogReadA0());
+	float rA0 = rAnalogReadA0();
+	long cmsOneBar = (long)(500.0 * rA0);
 	const long cmsMin = 10;
 	if(cmsMin > cmsOneBar) {
 		cmsOneBar = cmsMin;
