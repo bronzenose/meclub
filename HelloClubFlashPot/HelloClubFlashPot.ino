@@ -228,11 +228,10 @@ void setup() {
 void loop() {
 	server.handleClient();
 	ArduinoOTA.handle();
-	float rA0 = rAnalogReadA0();
-	long cmsOneBar = (long)(500.0 * rA0);
-	const long cmsMin = 10;
-	if(cmsMin > cmsOneBar) {
-		cmsOneBar = cmsMin;
+	float rA0 = rAnalogReadA0();          // <--- read knob position
+	long cmsOneBar = (long)(500.0 * rA0); // <--- turn into flash speed
+	if(3 > cmsOneBar) {                   // <--- is it too fast?
+		cmsOneBar = 3;                    // <--- if so, slow it down a bit
 	}
 	long cmsNow = millis();
 	const int iQuarterNote = (cmsNow / cmsOneBar) % 4;
