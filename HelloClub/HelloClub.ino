@@ -230,9 +230,8 @@ void loop() {
 	server.handleClient();
 	ArduinoOTA.handle();
 	long cmsOneBar = 1000;
-	const long cmsMin = 10;
-	if(cmsMin > cmsOneBar) {
-		cmsOneBar = cmsMin;
+	if(3 > cmsOneBar) {
+		cmsOneBar = 3;
 	}
 	long cmsNow = millis();
 	const int iQuarterNote = (cmsNow / cmsOneBar) % 4;
