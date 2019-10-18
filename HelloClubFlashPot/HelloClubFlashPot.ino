@@ -232,7 +232,7 @@ void loop() {
 	long cmsOneBar = (long)(500.0 * rA0); // <--- turn into flash speed
 	if(3 > cmsOneBar) {                   // <--- is it too fast?
 		cmsOneBar = 3;                    // <--- if so, slow it down a bit
-	}
+	}                                     // <--- we must match { with }
 	long cmsNow = millis();
 	const int iQuarterNote = (cmsNow / cmsOneBar) % 4;
 	int nLedOneState = g_nLedOn;
