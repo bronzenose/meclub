@@ -228,9 +228,8 @@ void setup() {
 void loop() {
 	server.handleClient();
 	ArduinoOTA.handle();
-	const float rA0 = rAnalogReadA0();
-
-	analogWrite(g_pinLedOne, 1023*rA0);
-	analogWrite(g_pinLedTwo, 1023*(1.0-rA0));
+	const float rA0 = rAnalogReadA0();        // <--- read knob position
+	analogWrite(g_pinLedOne, 1023*rA0);       // <--- get brighter with more rotation
+	analogWrite(g_pinLedTwo, 1023*(1.0-rA0)); // <--- get dimmer with more rotation
 }
 
