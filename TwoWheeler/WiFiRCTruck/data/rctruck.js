@@ -1,28 +1,59 @@
-var connection = new WebSocket('ws://' + location.hostname + ':81/', ['RCTruck']);
+var connection;
 
-connection.onopen = function () {
-	connection.send('Connect ' + new Date());
-};
+function initWebSocket(){
+	connection = new WebSocket('ws://' + location.hostname + ':81/', ['RCTruck']);
 
-connection.onerror = function (error) {
-	console.log('WebSocket Error ', error);
-};
+	connection.onopen = function () {
+		connection.send('Connect ' + new Date());
+	};
 
-connection.onmessage = function (e) {
-	console.log('Server: ', e.data);
-	if('busy' == e.data) {
-		enableUI(false);
-	} else if('ready' == e.data) {
-		enableUI(true);
+	connection.onerror = function (error) {
+		console.log('WebSocket Error ', error);
+	};
+
+	connection.onmessage = function (e) {
+		console.log('Server: ', e.data);
+		if('busy' == e.data) {
+			enableUI(false);
+		} else if('ready' == e.data) {
+			enableUI(true);
+		}
+	};
+
+	connection.onclose = function () {
+		console.log('WebSocket connection closed');
+	};
+}
+
+function vJoystickMousemove(e) {
+	if(0 != e.buttons) {
+		//console.log(e);
+		var cpxXMax = e.target.clientWidth; // alternative: offsetWidth https://developer.mozilla.org/en-US/docs/Web/API/CSS_Object_Model/Determining_the_dimensions_of_elements
+		var cpxYMax = e.target.clientHeight;
+		var rX = (e.offsetX/cpxXMax)-0.5;
+		var rY = (e.offsetY/cpxYMax)-0.5;
+		//console.log(rX, rY);
+		vJsWheels(rX, rY);
 	}
-};
+}
 
-connection.onclose = function () {
-	console.log('WebSocket connection closed');
-};
+function initJoystick() {
+	var eJs = document.getElementById('joystick');
+	//eJs.onmousemove=vJoystickMousemove;
+	eJs.addEventListener("mousemove", vJoystickMousemove);
+	eJs.addEventListener("mousedown", vJoystickMousemove);
+}
 
 function sliderChange(nSlider) {
 	// nothing to do for now.
+}
+
+function vJsWheels(rX, rY) {
+	var strCmd = 'J' + rX.toFixed(3) + ' ' + rY.toFixed(3);
+	console.log(strCmd);
+	if(connection){
+		connection.send(strCmd);
+	}
 }
 
 function startWheels() {
@@ -55,3 +86,10 @@ function enableUI(bEnable) {
 	// we never disable the 'stop' control.
 	['wheelL', 'wheelR', 'duration', 'go'].forEach(function(strid, i, rg) {enableID(strid, bEnable);});
 }
+
+function vRcTruckInit() {
+	initJoystick();
+	initWebSocket();
+}
+
+window.onload=vRcTruckInit;

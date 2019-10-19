@@ -34,6 +34,8 @@ static const bool g_bEnableOTA = true;
 static unsigned long g_cmsStop = millis();
 static float g_rSpeedRight = 0.0;
 static float g_rSpeedLeft = 0.0;
+static bool g_bDirRight = false;
+static bool g_bDirLeft = false;
 
 //ESP8266WiFiMulti wifiMulti;       // Create an instance of the ESP8266WiFiMulti class, called 'wifiMulti'
 
@@ -164,31 +166,60 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
 			Serial.printf("[%u] Disconnected!\n", num);
 			break;
 		case WStype_CONNECTED: {
-					       IPAddress ip = webSocket.remoteIP(num);
-					       Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-				       }
-				       break;
+								   IPAddress ip = webSocket.remoteIP(num);
+								   Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
+							   }
+							   break;
 		case WStype_TEXT:
-				       Serial.printf("[%u] get Text: %s\n", num, payload);
-				       if (payload[0] == 'G') {
-					       dbg_broadcast("you said START");
-					       uint32_t nAll = (uint32_t) strtol((const char *) &payload[1], NULL, 10);
-					       const int nR = nAll % 100;
-					       nAll = nAll / 100; // integer division returns the floor, not a rounding.
-					       const int nL  = nAll % 100;
-					       nAll = nAll / 100;
-					       const int nD  = nAll % 100;
-					       g_rSpeedLeft = ((float)nL)/99.0;
-					       g_rSpeedRight = ((float)nR)/99.0;
-					       g_cmsStop = millis() + (nD * 100);
-					       Serial.printf("start left at speed %d, right at %d for duration %d", nL, nR, nD);
-				       } else if (payload[0] == '!') {
-					       dbg_broadcast("you said STOP");
-					       g_rSpeedLeft = 0;
-					       g_rSpeedRight = 0;
-					       g_cmsStop = millis();
-				       }				   
-				       break;
+							   //Serial.printf("[%u] get Text: %s\n", num, payload);
+							   if (payload[0] == 'G') {
+								   dbg_broadcast("you said START");
+								   uint32_t nAll = (uint32_t) strtol((const char *) &payload[1], NULL, 10);
+								   const int nR = nAll % 100;
+								   nAll = nAll / 100; // integer division returns the floor, not a rounding.
+								   const int nL  = nAll % 100;
+								   nAll = nAll / 100;
+								   const int nD  = nAll % 100;
+								   g_rSpeedLeft = ((float)nL)/99.0;
+								   g_rSpeedRight = ((float)nR)/99.0;
+								   g_cmsStop = millis() + (nD * 100);
+								   Serial.printf("start left at speed %d, right at %d for duration %d", nL, nR, nD);
+							   } else if (payload[0] == 'J') {
+								   // a Joystick command. Format is "J+n.n3 +n.n3"
+								   float rX = 0.0;
+								   float rY = 0.0;
+								   const int cScanned = sscanf((const char*)&payload[1], "%f %f", &rX, &rY);
+								   if(cScanned != 2) {
+									   Serial.println("sscanf failure");
+								   }
+
+								   g_bDirRight = rX >0.0;
+								   g_bDirLeft = rY >0.0;
+								   // abs() returns an int. ugh.
+								   rX = (g_bDirRight ? 2.0 : -2.0) * rX; // range from client is -0.5 to +0.5 so adjust to 0 to 1.0
+								   rY = (g_bDirLeft ? 2.0 : -2.0) * rY;
+								   static const float rDeadzone = 0.5; // motors have a high minimum
+								   if(rX < rDeadzone) rX = 0.0;
+								   if(rY < rDeadzone) rY = 0.0;
+								   g_rSpeedRight = rX;
+								   g_rSpeedLeft = rY;
+								   g_cmsStop = millis() + 2000;
+								   /*
+									  Serial.print(rX);
+									  Serial.print(',');
+									  Serial.print(rY);
+									  Serial.print(':');
+									  Serial.print(g_rSpeedRight);
+									  Serial.print(',');
+									  Serial.println(g_rSpeedLeft);
+									*/
+							   } else if (payload[0] == '!') {
+								   dbg_broadcast("you said STOP");
+								   g_rSpeedLeft = 0;
+								   g_rSpeedRight = 0;
+								   g_cmsStop = millis();
+							   }				   
+							   break;
 	}
 }
 
@@ -376,5 +407,7 @@ void loop() {
 	displayMessageMotors(nSpeedRight);
 	analogWrite(PIN_PWM_RIGHT, nSpeedRight);
 	analogWrite(PIN_PWM_LEFT, nSpeedLeft);
+	digitalWrite(PIN_DIRECTION_RIGHT, g_bDirRight);
+	digitalWrite(PIN_DIRECTION_LEFT, g_bDirLeft);
 }
 
