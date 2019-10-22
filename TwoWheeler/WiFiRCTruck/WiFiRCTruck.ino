@@ -31,6 +31,8 @@ static const bool g_bEnableOTA = true;
 #define PIN_PWM_RIGHT 4
 #define PIN_DIRECTION_LEFT 0
 #define PIN_DIRECTION_RIGHT 2
+static const bool g_bReverseLeft = 0;
+static const bool g_bReverseRight = 1;
 static unsigned long g_cmsStop = millis();
 static float g_rSpeedRight = 0.0;
 static float g_rSpeedLeft = 0.0;
@@ -407,7 +409,7 @@ void loop() {
 	displayMessageMotors(nSpeedRight);
 	analogWrite(PIN_PWM_RIGHT, nSpeedRight);
 	analogWrite(PIN_PWM_LEFT, nSpeedLeft);
-	digitalWrite(PIN_DIRECTION_RIGHT, g_bDirRight);
-	digitalWrite(PIN_DIRECTION_LEFT, g_bDirLeft);
+	digitalWrite(PIN_DIRECTION_RIGHT, g_bDirRight ^ g_bReverseRight);
+	digitalWrite(PIN_DIRECTION_LEFT, g_bDirLeft ^ g_bReverseLeft);
 }
 
