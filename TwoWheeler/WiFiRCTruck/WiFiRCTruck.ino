@@ -27,10 +27,10 @@ static const bool g_bEnableMDNS = true;
 static const bool g_bEnableWebSockets = true;
 static const bool g_bEnableOTA = true;
 
-#define PIN_PWM_LEFT 5
-#define PIN_PWM_RIGHT 4
-#define PIN_DIRECTION_LEFT 0
-#define PIN_DIRECTION_RIGHT 2
+#define PIN_PWM_LEFT 5 /* D1 */
+#define PIN_PWM_RIGHT 4 /* D2 */
+#define PIN_DIRECTION_LEFT 0 /* D3 */
+#define PIN_DIRECTION_RIGHT 2 /* D4 */
 static const bool g_bReverseLeft = 0;
 static const bool g_bReverseRight = 1;
 static unsigned long g_cmsStop = millis();
