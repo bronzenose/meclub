@@ -206,31 +206,37 @@ void setup() {
 void loop() {
 	vClubLoop();
 	if(g_bFollowMode){
-static PeriodicEvent s_evt(20);
-if(s_evt.bEventFired()){
-		static const float rmmTarget = 150;
-		static const float rpmmCorrectionRate = 1023.0/50.0; // full speed if off by more than 40mm
-		float rmmActual = g_echoRight.rmmMeasure();
-Serial.print(rmmActual);
-Serial.print("mm ");
-	 float rmmError = rmmTarget-rmmActual;
-		bool bForward = false;
-		if(0.0 > rmmError) {
-			bForward = true;
-			rmmError = -rmmError;
-		}
-		float rSpeed = rmmError * rpmmCorrectionRate;
-		if(rSpeed > 1023.0){
-			rSpeed = 1023.0;
-		}
-		digitalWrite(g_pinDirectionRight, bForward);
-		digitalWrite(g_pinDirectionLeft, bForward);
-		analogWrite(g_pinPwmRight, rSpeed);
-		analogWrite(g_pinPwmLeft, rSpeed);
+		static PeriodicEvent s_evt(20);
+		if(s_evt.bEventFired()){
+			static const float rmmTarget = 150;
+			static const float rpmmCorrectionRate = 1023.0/50.0; // full speed if off by more than 40mm
+			float rmmActual = g_echoRight.rmmMeasure();
+			float rSpeed = 0.0;
+			bool bForward = true;
+			if(0 != rmmActual) {
+				// otherwise no object was detected
 
-		Serial.print(bForward ? "Fwd " : "Rev ");
-		Serial.println(rSpeed);
-}
+				Serial.print(rmmActual);
+				Serial.print("mm ");
+				float rmmError = rmmTarget-rmmActual;
+				bForward = false;
+				if(0.0 > rmmError) {
+					bForward = true;
+					rmmError = -rmmError;
+				}
+				rSpeed = rmmError * rpmmCorrectionRate;
+				if(rSpeed > 1023.0){
+					rSpeed = 1023.0;
+				}
+			}
+			digitalWrite(g_pinDirectionRight, bForward ^ g_bReverseRight);
+			digitalWrite(g_pinDirectionLeft, bForward ^ g_bReverseLeft);
+			analogWrite(g_pinPwmRight, rSpeed);
+			analogWrite(g_pinPwmLeft, rSpeed);
+
+			Serial.print(bForward ? "Fwd " : "Rev ");
+			Serial.println(rSpeed);
+		}
 	} else {
 		if(millis() > g_cmsStop) {
 			g_rSpeedRight = 0.0;
