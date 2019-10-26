@@ -14,6 +14,7 @@
 #include "melib/ClubMembers.h"
 #include "melib/Debug.h"
 #include "melib/ClubWiFi.h"
+#include "melib/PeriodicEvent.h"
 
 //#define SERIAL_DEBUG_WIFI
 //#define SERIAL_DEBUG_WEBSERVER
@@ -22,12 +23,13 @@
 static const bool g_bEnableMDNS = true;
 static const bool g_bEnableWebSockets = true;
 static const bool g_bEnableOTA = true;
+static const bool g_bFollowMode = true;
 
 static const int  g_pinD0 = 16 ; /*     works for pulsing stepper */
 static const int  g_pinD1 = 5  ; /*     works for pulsing stepper */
 static const int  g_pinD2 = 4  ; /*     works for pulsing stepper */
 static const int  g_pinD3 = 0  ; /* !!! connection prevents boot (also labeled "FLASH") */
-static const int  g_pinD4 = 2  ; /* !!! NODE_MCU_PIN_D4 is used for programming (also labeled "TXD1" */
+static const int  g_pinD4 = 2  ; /* !!! NODE_MCU_g_pinD4 is used for programming (also labeled "TXD1" */
 static const int  g_pinD5 = 14 ; /* works for pulsing stepper */
 static const int  g_pinD6 = 12 ; /* works for pulsing stepper */
 static const int  g_pinD7 = 13 ; /* appear not to work as TwoWire SCL but maybe it's only pin D8 that won't play */
@@ -72,60 +74,60 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t lenght
 			Serial.printf("[%u] Disconnected!\n", num);
 			break;
 		case WStype_CONNECTED: {
-								   IPAddress ip = webSocket.remoteIP(num);
-								   Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-							   }
-							   break;
+					       IPAddress ip = webSocket.remoteIP(num);
+					       Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
+				       }
+				       break;
 		case WStype_TEXT:
-							   //Serial.printf("[%u] get Text: %s\n", num, payload);
-							   if (payload[0] == 'G') {
-								   dbg_broadcast("you said START");
-								   uint32_t nAll = (uint32_t) strtol((const char *) &payload[1], NULL, 10);
-								   const int nR = nAll % 100;
-								   nAll = nAll / 100; // integer division returns the floor, not a rounding.
-								   const int nL  = nAll % 100;
-								   nAll = nAll / 100;
-								   const int nD  = nAll % 100;
-								   g_rSpeedLeft = ((float)nL)/99.0;
-								   g_rSpeedRight = ((float)nR)/99.0;
-								   g_cmsStop = millis() + (nD * 100);
-								   Serial.printf("start left at speed %d, right at %d for duration %d", nL, nR, nD);
-							   } else if (payload[0] == 'J') {
-								   // a Joystick command. Format is "J+n.n3 +n.n3"
-								   float rX = 0.0;
-								   float rY = 0.0;
-								   const int cScanned = sscanf((const char*)&payload[1], "%f %f", &rX, &rY);
-								   if(cScanned != 2) {
-									   Serial.println("sscanf failure");
-								   }
+				       //Serial.printf("[%u] get Text: %s\n", num, payload);
+				       if (payload[0] == 'G') {
+					       dbg_broadcast("you said START");
+					       uint32_t nAll = (uint32_t) strtol((const char *) &payload[1], NULL, 10);
+					       const int nR = nAll % 100;
+					       nAll = nAll / 100; // integer division returns the floor, not a rounding.
+					       const int nL  = nAll % 100;
+					       nAll = nAll / 100;
+					       const int nD  = nAll % 100;
+					       g_rSpeedLeft = ((float)nL)/99.0;
+					       g_rSpeedRight = ((float)nR)/99.0;
+					       g_cmsStop = millis() + (nD * 100);
+					       Serial.printf("start left at speed %d, right at %d for duration %d", nL, nR, nD);
+				       } else if (payload[0] == 'J') {
+					       // a Joystick command. Format is "J+n.n3 +n.n3"
+					       float rX = 0.0;
+					       float rY = 0.0;
+					       const int cScanned = sscanf((const char*)&payload[1], "%f %f", &rX, &rY);
+					       if(cScanned != 2) {
+						       Serial.println("sscanf failure");
+					       }
 
-								   g_bDirRight = rX >0.0;
-								   g_bDirLeft = rY >0.0;
-								   // abs() returns an int. ugh.
-								   rX = (g_bDirRight ? 2.0 : -2.0) * rX; // range from client is -0.5 to +0.5 so adjust to 0 to 1.0
-								   rY = (g_bDirLeft ? 2.0 : -2.0) * rY;
-								   static const float rDeadzone = 0.5; // motors have a high minimum
-								   if(rX < rDeadzone) rX = 0.0;
-								   if(rY < rDeadzone) rY = 0.0;
-								   g_rSpeedRight = rX;
-								   g_rSpeedLeft = rY;
-								   g_cmsStop = millis() + 2000;
-								   /*
-									  Serial.print(rX);
-									  Serial.print(',');
-									  Serial.print(rY);
-									  Serial.print(':');
-									  Serial.print(g_rSpeedRight);
-									  Serial.print(',');
-									  Serial.println(g_rSpeedLeft);
-									*/
-							   } else if (payload[0] == '!') {
-								   dbg_broadcast("you said STOP");
-								   g_rSpeedLeft = 0;
-								   g_rSpeedRight = 0;
-								   g_cmsStop = millis();
-							   }				   
-							   break;
+					       g_bDirRight = rX >0.0;
+					       g_bDirLeft = rY >0.0;
+					       // abs() returns an int. ugh.
+					       rX = (g_bDirRight ? 2.0 : -2.0) * rX; // range from client is -0.5 to +0.5 so adjust to 0 to 1.0
+					       rY = (g_bDirLeft ? 2.0 : -2.0) * rY;
+					       static const float rDeadzone = 0.5; // motors have a high minimum
+					       if(rX < rDeadzone) rX = 0.0;
+					       if(rY < rDeadzone) rY = 0.0;
+					       g_rSpeedRight = rX;
+					       g_rSpeedLeft = rY;
+					       g_cmsStop = millis() + 2000;
+					       /*
+						  Serial.print(rX);
+						  Serial.print(',');
+						  Serial.print(rY);
+						  Serial.print(':');
+						  Serial.print(g_rSpeedRight);
+						  Serial.print(',');
+						  Serial.println(g_rSpeedLeft);
+						*/
+				       } else if (payload[0] == '!') {
+					       dbg_broadcast("you said STOP");
+					       g_rSpeedLeft = 0;
+					       g_rSpeedRight = 0;
+					       g_cmsStop = millis();
+				       }				   
+				       break;
 	}
 }
 const size_t g_cchStatusMessage = 32;
@@ -193,29 +195,58 @@ void setup() {
 	delay(10);
 	Serial.println("Hello from ESP8266");
 
-	pinMode(PIN_PWM_RIGHT, OUTPUT);
-	pinMode(PIN_PWM_LEFT, OUTPUT);
-	pinMode(PIN_DIRECTION_RIGHT, OUTPUT);
-	pinMode(PIN_DIRECTION_LEFT, OUTPUT);
+	pinMode(g_pinPwmRight, OUTPUT);
+	pinMode(g_pinPwmLeft, OUTPUT);
+	pinMode(g_pinDirectionLeft, OUTPUT);
+	pinMode(g_pinDirectionRight, OUTPUT);
 
 	vClubSetup();
 }
 
 void loop() {
 	vClubLoop();
-	if(millis() > g_cmsStop) {
-		g_rSpeedRight = 0.0;
-		g_rSpeedLeft = 0.0;
+	if(g_bFollowMode){
+static PeriodicEvent s_evt(20);
+if(s_evt.bEventFired()){
+		static const float rmmTarget = 150;
+		static const float rpmmCorrectionRate = 1023.0/50.0; // full speed if off by more than 40mm
+		float rmmActual = g_echoRight.rmmMeasure();
+Serial.print(rmmActual);
+Serial.print("mm ");
+	 float rmmError = rmmTarget-rmmActual;
+		bool bForward = false;
+		if(0.0 > rmmError) {
+			bForward = true;
+			rmmError = -rmmError;
+		}
+		float rSpeed = rmmError * rpmmCorrectionRate;
+		if(rSpeed > 1023.0){
+			rSpeed = 1023.0;
+		}
+		digitalWrite(g_pinDirectionRight, bForward);
+		digitalWrite(g_pinDirectionLeft, bForward);
+		analogWrite(g_pinPwmRight, rSpeed);
+		analogWrite(g_pinPwmLeft, rSpeed);
+
+		Serial.print(bForward ? "Fwd " : "Rev ");
+		Serial.println(rSpeed);
+}
+	} else {
+		if(millis() > g_cmsStop) {
+			g_rSpeedRight = 0.0;
+			g_rSpeedLeft = 0.0;
+		}
+		// see http://arduino.esp8266.com/Arduino/versions/2.0.0/doc/reference.html#analog-output
+		// consider using analogWriteRange(new_range);
+		int nSpeedRight = g_rSpeedRight * 1023.0;
+		int nSpeedLeft = g_rSpeedLeft * 1023.0;
+		displayMessageMotors(nSpeedLeft);
+		displayMessageMotors(nSpeedRight);
+		analogWrite(g_pinPwmLeft, nSpeedRight);
+		analogWrite(g_pinPwmRight, nSpeedLeft);
+		digitalWrite(g_pinDirectionRight, g_bDirRight ^ g_bReverseRight);
+		digitalWrite(g_pinDirectionLeft, g_bDirLeft ^ g_bReverseLeft);
+
 	}
-	// see http://arduino.esp8266.com/Arduino/versions/2.0.0/doc/reference.html#analog-output
-	// consider using analogWriteRange(new_range);
-	int nSpeedRight = g_rSpeedRight * 1023.0;
-	int nSpeedLeft = g_rSpeedLeft * 1023.0;
-	displayMessageMotors(nSpeedLeft);
-	displayMessageMotors(nSpeedRight);
-	analogWrite(PIN_PWM_RIGHT, nSpeedRight);
-	analogWrite(PIN_PWM_LEFT, nSpeedLeft);
-	digitalWrite(PIN_DIRECTION_RIGHT, g_bDirRight ^ g_bReverseRight);
-	digitalWrite(PIN_DIRECTION_LEFT, g_bDirLeft ^ g_bReverseLeft);
 }
 

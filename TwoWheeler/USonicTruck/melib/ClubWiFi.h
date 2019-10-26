@@ -116,11 +116,13 @@ void startWiFi() {
 	Serial.println("\" started\r\n");
 	WiFi.printDiag(Serial);
 
+	/*
 	Serial.println("Connecting");
 	while(WiFi.softAPgetStationNum() < 1) {
 		delay(250);
 		Serial.println('.');
 	}
+	*/
 	Serial.println("");
 #ifdef SERIAL_DEBUG_WIFI
 	displayMessage("after startWiFi() we find...");
